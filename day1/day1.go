@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var logger = log.Default()
+
 func Part1() {
 	file, _ := os.Open("day1/input.txt")
 	defer file.Close()
@@ -36,7 +38,7 @@ func Part1() {
 		}
 	}
 
-	log.Default().Printf("1: %d", dist)
+	logger.Printf("Day 1, part 1: %d", dist)
 }
 
 func Part2() {
@@ -65,6 +67,5 @@ func Part2() {
 			dist = dist + (l * count)
 		}
 	}
-
-	log.Default().Printf("2: %d", dist)
+	logger.Printf("Day 1, part 2: %d", dist)
 }
