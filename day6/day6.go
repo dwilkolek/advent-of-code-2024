@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"strings"
+	"sync"
 )
 
 var logger = log.Default()
@@ -18,48 +19,61 @@ func Part1() {
 	logger.Printf("Day 6, part 1: %d", len(person.visited))
 }
 
+func clone(person pers, areaO area) (pers, area) {
+	personCopy := pers{
+		dir:     person.dir,
+		x:       person.x,
+		y:       person.y,
+		visited: make(map[pos]dir),
+	}
+	areaObjCopy := area{
+		obstacles: maps.Clone(areaO.obstacles),
+		maxX:      areaO.maxX,
+		maxY:      areaO.maxY,
+	}
+
+	return personCopy, areaObjCopy
+}
+
 func Part2() {
 	person, areaObj := read()
-	looped := 0
 
-	for y := 0; y <= areaObj.maxY; y++ {
-		for x := 0; x <= areaObj.maxX; x++ {
-			personCopy := pers{
-				dir:     person.dir,
-				x:       person.x,
-				y:       person.y,
-				visited: make(map[pos]dir),
-			}
-			areaObjCopy := area{
-				obstacles: maps.Clone(areaObj.obstacles),
-				maxX:      areaObj.maxX,
-				maxY:      areaObj.maxY,
-			}
-			_, has := areaObjCopy.obstacles[pos{
-				x, y,
-			}]
-			if has {
-				continue
-			}
-			areaObjCopy.obstacles[pos{
-				x, y,
-			}] = true
+	originalPerson, _ := clone(person, areaObj)
+	for moveAndMark(&originalPerson, areaObj) == CONTINUE {
+	}
+
+	loopedChan := make(chan int, len(originalPerson.visited))
+	var wg sync.WaitGroup
+	for obstaclePos, _ := range originalPerson.visited {
+		wg.Add(1)
+		personCopy, areaObjCopy := clone(person, areaObj)
+		areaObjCopy.obstacles[obstaclePos] = true
+
+		go func(person pers, area area, loopedChan chan int, wg *sync.WaitGroup) {
+			defer wg.Done()
 			keepRunning := true
 			for keepRunning {
-				result := moveAndMark(&personCopy, areaObjCopy)
+				result := moveAndMark(&person, area)
 				switch result {
 				case STOP:
 					keepRunning = false
 					break
 				case STOP_LOOPED:
-					looped += 1
+					loopedChan <- 1
 					keepRunning = false
 					break
 				case CONTINUE:
 					break
 				}
 			}
-		}
+		}(personCopy, areaObjCopy, loopedChan, &wg)
+	}
+
+	wg.Wait()
+	close(loopedChan)
+	looped := 0
+	for s := range loopedChan {
+		looped += s
 	}
 
 	logger.Printf("Day 6, part 2: %d", looped)
