@@ -65,6 +65,10 @@ func isValid(index int, value uint64, numbers []uint64, result uint64, ops []op)
 	if index == len(numbers) {
 		return value == result
 	}
+
+	if value > result {
+		return false
+	}
 	ok := false
 	for _, op := range ops {
 		switch op {
