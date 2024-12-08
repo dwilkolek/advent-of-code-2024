@@ -11,26 +11,18 @@ var logger = log.Default()
 
 func Part1() {
 	area := readMap()
-	antonodes := calculateAntiNodes(area)
-	sum := draw(area, antonodes)
-	//sum := 0
-	//for _, node := range antonodes {
-	//	sum += len(node)
-	//}
+	antiNodes := calculateAntiNodes(area)
+	sum := solve(area, antiNodes, false)
 	logger.Printf("Day 8, part 1: %d", sum)
 }
 
 func Part2() {
 	area := readMap()
-	antonodes := calculateAntiNodes(area)
-	sum := draw(area, antonodes)
-	//sum := 0
-	//for _, node := range antonodes {
-	//	sum += len(node)
-	//}
+	antiNodes := calculateAntiNodes2(area)
+	sum := solve(area, antiNodes, false)
 	logger.Printf("Day 8, part 2: %d", sum)
 }
-func draw(area area, nodes map[string][]p) int {
+func solve(area area, nodes map[string][]p, draw bool) int {
 	unqNodes := map[p]bool{}
 	for _, nodesType := range nodes {
 		for _, node := range nodesType {
@@ -43,33 +35,63 @@ func draw(area area, nodes map[string][]p) int {
 			_, ok := unqNodes[p{x, y}]
 			if ok {
 				count++
-				print("#")
+				if draw {
+					print("#")
+				}
 			} else {
-				print(".")
+				if draw {
+					print(".")
+				}
 			}
 		}
-		println()
+		if draw {
+			println()
+		}
 	}
 	return count
 }
 func calculateAntiNodes(area area) map[string][]p {
-	antinodes := map[string][]p{}
+	antiNodes := map[string][]p{}
 	for k, v := range area.antennas {
-		logger.Printf("Doing %s", k)
-		for ai, antena := range v {
-			for oai, otherAntena := range v {
+		for ai, antenna := range v {
+			for oai, otherAntenna := range v {
 				if ai == oai {
 					continue
 				}
-				distX := antena.x - otherAntena.x
-				distY := antena.y - otherAntena.y
-				//_, used := area.usedPlaces[p{antena.x + distX, antena.y + distY}]
-				antinodes[k] = append(antinodes[k], p{antena.x + distX, antena.y + distY})
+				distX := antenna.x - otherAntenna.x
+				distY := antenna.y - otherAntenna.y
+				antiNodes[k] = append(antiNodes[k], p{antenna.x + distX, antenna.y + distY})
 			}
 		}
 	}
-	return antinodes
+	return antiNodes
 }
+
+func calculateAntiNodes2(area area) map[string][]p {
+	antiNodes := map[string][]p{}
+	for k, v := range area.antennas {
+		for ai, antenna := range v {
+			for oai, otherAntenna := range v {
+				if ai == oai {
+					continue
+				}
+				distX := antenna.x - otherAntenna.x
+				distY := antenna.y - otherAntenna.y
+				for times := 0; times < 1000; times++ {
+					newPos := p{antenna.x + times*distX, antenna.y + times*distY}
+					if newPos.x >= 0 && newPos.y >= 0 && newPos.x < area.maxX && newPos.y < area.maxY {
+						antiNodes[k] = append(antiNodes[k], newPos)
+					} else {
+						break
+					}
+				}
+
+			}
+		}
+	}
+	return antiNodes
+}
+
 func readMap() area {
 	file, _ := os.Open("day8/input.txt")
 	defer file.Close()
@@ -93,18 +115,16 @@ func readMap() area {
 		y += 1
 	}
 	return area{
-		antennas:   antennas,
-		maxX:       maxX + 1,
-		maxY:       y,
-		usedPlaces: usedPlaces,
+		antennas: antennas,
+		maxX:     maxX + 1,
+		maxY:     y,
 	}
 }
 
 type area struct {
-	antennas   map[string][]p
-	maxX       int
-	maxY       int
-	usedPlaces map[p]bool
+	antennas map[string][]p
+	maxX     int
+	maxY     int
 }
 type p struct {
 	x int
