@@ -9,6 +9,7 @@ import (
 	"github.com/dwilkolek/advent-of-code-2024/day6"
 	"github.com/dwilkolek/advent-of-code-2024/day7"
 	"github.com/dwilkolek/advent-of-code-2024/day8"
+	"github.com/dwilkolek/advent-of-code-2024/day9"
 )
 
 func main() {
@@ -28,5 +29,7 @@ func main() {
 	day7.Part2()
 	day8.Part1()
 	day8.Part2()
+	day9.Part1()
+	day9.Part2()
 
 }
