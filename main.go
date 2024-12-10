@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/dwilkolek/advent-of-code-2024/day1"
+	"github.com/dwilkolek/advent-of-code-2024/day10"
 	"github.com/dwilkolek/advent-of-code-2024/day2"
 	"github.com/dwilkolek/advent-of-code-2024/day3"
 	"github.com/dwilkolek/advent-of-code-2024/day4"
@@ -31,5 +32,7 @@ func main() {
 	day8.Part2()
 	day9.Part1()
 	day9.Part2()
+	day10.Part1()
+	day10.Part2()
 
 }
