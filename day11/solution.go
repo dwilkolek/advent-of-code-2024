@@ -12,16 +12,50 @@ import (
 var logger = log.Default()
 
 func Part1() {
-	solve()
-	logger.Printf("Day 11, part 1: %d", solve())
+	logger.Printf("Day 11, part 1: %d", solve2(25))
 }
 
 func Part2() {
-
-	logger.Printf("Day 11, part 2: %d", solve())
+	logger.Printf("Day 11, part 2: %d", solve2(75))
 }
 
-func solve() int {
+func nextStone(stone int) []int {
+	if stone == 0 {
+		return []int{1}
+	} else if len(fmt.Sprintf("%d", stone))%2 == 0 {
+		ns := fmt.Sprintf("%d", stone)
+		a, _ := strconv.Atoi(ns[:len(ns)/2])
+		b, _ := strconv.Atoi(ns[len(ns)/2:])
+		return []int{a, b}
+	} else {
+		return []int{stone * 2024}
+	}
+}
+
+type cacheKey struct {
+	stone int
+	iter  int
+}
+
+var cache = map[cacheKey]int{}
+
+func countStones(stone int, iterLeft int) int {
+	counted, ok := cache[cacheKey{stone, iterLeft}]
+	if ok {
+		return counted
+	}
+	if 0 == iterLeft {
+		return 1
+	}
+	newStones := nextStone(stone)
+	count := 0
+	for _, nStone := range newStones {
+		count += countStones(nStone, iterLeft-1)
+	}
+	cache[cacheKey{stone, iterLeft}] = count
+	return count
+}
+func solve2(maxIter int) int {
 	file, _ := os.Open("day11/input.txt")
 	defer file.Close()
 
@@ -35,26 +69,12 @@ func solve() int {
 			stones = append(stones, stone)
 		}
 
-		for i := 0; i < 25; i++ {
-			var newStones []int
-			//logger.Printf("Loop %d", i)
-			for _, stone := range stones {
-				if stone == 0 {
-					newStones = append(newStones, 1)
-				} else if len(fmt.Sprintf("%d", stone))%2 == 0 {
-					ns := fmt.Sprintf("%d", stone)
-					a, _ := strconv.Atoi(ns[:len(ns)/2])
-					newStones = append(newStones, a)
-					b, _ := strconv.Atoi(ns[len(ns)/2:])
-					newStones = append(newStones, b)
-				} else {
-					newStones = append(newStones, stone*2024)
-				}
-			}
-			stones = newStones
+		count := 0
+		for _, stone := range stones {
+			count += countStones(stone, maxIter)
 		}
 
-		return len(stones)
+		return count
 	}
-	return 0
+	return -1
 }
