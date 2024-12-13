@@ -3,7 +3,6 @@ package day13
 import (
 	"bufio"
 	"log"
-	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -24,145 +23,23 @@ func solve(offset int, hasClickLimit bool) int {
 
 	sum := 0
 	for _, p := range prizes {
-		cost := findCheapestWin(p, hasClickLimit)
-		if cost != math.MaxInt {
-			sum += cost
-		}
+		sum += calculateTokenSpent(p, hasClickLimit)
 	}
 	return sum
 }
 
-func findCheapestWin(p prize, hasClickLimit bool) int {
-	var best = state{
-		coordinates: coordinates{
-			x: 0,
-			y: 0,
-		},
-		cacheKey: cacheKey{
-			a: 0,
-			b: 0,
-		},
-		cost: math.MaxInt,
-		isOk: true,
-	}
-	maxAClicks := int(math.Min(float64(p.prize.y/p.a.y), float64(p.prize.x/p.a.x)))
-	logger.Printf("max A clicks: %d", maxAClicks)
-	for aClicks := maxAClicks; aClicks > 0; aClicks-- {
-		logger.Printf("max A clicks left: %d", aClicks)
-		afterA := click(state{
-			coordinates: coordinates{
-				x: 0,
-				y: 0,
-			},
-			cacheKey: cacheKey{
-				a: 0,
-				b: 0,
-			},
-			cost: 0,
-			isOk: true,
-		}, p.a, cacheKey{
-			a: aClicks,
-			b: 0,
-		}, aClicks)
-		bClicks := int(math.Min(float64((p.prize.y-afterA.coordinates.y)/p.b.y), float64((p.prize.x-afterA.coordinates.x)/p.b.x)))
-		s := click(afterA, p.b, cacheKey{
-			a: aClicks,
-			b: bClicks,
-		}, bClicks)
-
-		if hasClickLimit && (s.cacheKey.a > 100 || s.cacheKey.b > 100) {
-			continue
-		}
-		if s.y > p.prize.y || s.x > p.prize.x {
-			continue
-		}
-		if s.y == p.prize.y && s.x == p.prize.x {
-			if s.cost < best.cost {
-				logger.Printf("Found success %d", s.cost)
-				best = s
-			}
-		}
-
+func calculateTokenSpent(p prize, hasClickLimit bool) int {
+	a := (p.prize.x*p.b.y - p.prize.y*p.b.x) / (p.a.x*p.b.y - p.a.y*p.b.x)
+	b := (p.prize.y*p.a.x - p.prize.x*p.a.y) / (p.a.x*p.b.y - p.a.y*p.b.x)
+	if hasClickLimit && (a > 100 || b > 100) {
+		return 0
 	}
 
-	//logger.Printf("a=%d b=%d cost=%d", best.cacheKey.a, best.cacheKey.b, best.cost)
-	return best.cost
-}
-
-func nww(a int, b int) []int {
-	var v []int
-	i := 2
-	for {
-		if a == 0 && b == 0 {
-			break
-		}
-		if a%i == 0 && b%i == 0 {
-			a = a / i
-			b = b / i
-			v = append(v, i)
-		} else {
-			i++
-		}
-	}
-	return v
-}
-
-func cachedLookDeeper(p prize, s state, c map[cacheKey]state, hasClickLimit bool) state {
-	cState, ok := c[s.cacheKey]
-	if ok {
-		return cState
-	}
-	ns := lookDeeper(p, s, hasClickLimit)
-	c[s.cacheKey] = ns
-	return ns
-}
-func lookDeeper(p prize, s state, hasClickLimit bool) state {
-	if hasClickLimit && (s.cacheKey.a > 100 || s.cacheKey.b > 100) {
-		s.cost = math.MaxInt64
-		return s
-	}
-	if s.y > p.prize.y || s.x > p.prize.x {
-		s.isOk = false
-		s.cost = math.MaxInt64
-		return s
-	}
-	if s.y == p.prize.y && s.x == p.prize.x {
-		return s
+	if a*p.a.x+b*p.b.x == p.prize.x && a*p.a.y+b*p.b.y == p.prize.y {
+		return a*p.a.cost + b*p.b.cost
 	}
 
-	aClick := click(s, p.a, cacheKey{
-		a: s.cacheKey.a + 1,
-		b: s.cacheKey.b + 0,
-	}, 1)
-	bClick := click(s, p.b, cacheKey{
-		a: s.cacheKey.a + 0,
-		b: s.cacheKey.b + 1,
-	}, 1)
-
-	if aClick.cost < bClick.cost {
-		return aClick
-	} else {
-		return bClick
-	}
-}
-
-func click(s state, btn button, cacheKey cacheKey, count int) state {
-	return state{
-		coordinates: coordinates{
-			x: s.coordinates.x + count*btn.x,
-			y: s.coordinates.y + count*btn.y,
-		},
-		cost:     s.cost + (count * btn.cost),
-		cacheKey: cacheKey,
-		isOk:     true,
-	}
-}
-
-type state struct {
-	coordinates
-	cost int
-	cacheKey
-	isOk bool
+	return 0
 }
 
 func getPrizes(offset int) []prize {
@@ -219,9 +96,4 @@ type prize struct {
 	a     button
 	b     button
 	prize coordinates
-}
-
-type cacheKey struct {
-	a int
-	b int
 }
