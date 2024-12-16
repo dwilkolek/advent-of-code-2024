@@ -4,18 +4,26 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strings"
 )
 
 var logger = log.Default()
+var bestScore, bestSeats = math.MaxInt32, math.MaxInt32
 
 func Part1() {
-	logger.Printf("Day 16, part 1: %d", solve())
+	if bestScore == math.MaxInt32 {
+		bestScore, bestSeats = solve()
+	}
+	logger.Printf("Day 16, part 1: %d", bestScore)
 }
 
 func Part2() {
-	logger.Printf("Day 16, part 2: %d", solve())
+	if bestSeats == math.MaxInt32 {
+		bestScore, bestSeats = solve()
+	}
+	logger.Printf("Day 16, part 2: %d", bestSeats)
 }
 
 type coord struct {
@@ -25,6 +33,7 @@ type Reindeer struct {
 	position coord
 	score    int
 	facing   coord
+	track    []Reindeer
 }
 
 var dirs = []coord{
@@ -53,24 +62,36 @@ func (r Reindeer) move(area map[coord]string, step coord) (Reindeer, error) {
 	if ch == "#" {
 		return Reindeer{}, fmt.Errorf("step coordinate is a wall")
 	}
-
+	newTrack := make([]Reindeer, len(r.track))
+	for k, v := range r.track {
+		newTrack[k] = v
+	}
+	newTrack = append(newTrack, r)
 	if r.facing.x == step.x && r.facing.y == step.y {
 		return Reindeer{
 			position: nextPosition,
 			score:    r.score + 1,
 			facing:   r.facing,
+			track:    newTrack,
 		}, nil
 	} else {
 		return Reindeer{
-			position: nextPosition,
-			score:    r.score + 1000 + 1,
+			position: coord{r.position.x, r.position.y},
+			score:    r.score + 1000,
 			facing:   step,
+			track:    newTrack,
 		}, nil
 	}
 
 }
 
-func solve() int {
+func cacheKey(r Reindeer) string {
+	return fmt.Sprintf("pos=%d,%d, f=%d,%d", r.position.x, r.position.y, r.facing.x, r.facing.y)
+}
+func instantWinCacheKey(r Reindeer) string {
+	return fmt.Sprintf("pos=%d,%d, f=%d,%d score=%d", r.position.x, r.position.y, r.facing.x, r.facing.y, r.score)
+}
+func solve() (int, int) {
 	file, _ := os.Open("day16/input.txt")
 	defer file.Close()
 
@@ -107,50 +128,73 @@ func solve() int {
 			score: 0,
 		},
 	}
-	visited := map[coord]int{}
+	visited := map[string]int{}
+	grantInstantWin := map[string]bool{}
+	winners := []Reindeer{
+		{position: end, score: math.MaxInt64, facing: coord{x: -1, y: -1}, track: []Reindeer{}},
+	}
+
 	for len(possibleCases) > 0 {
 		nextPossibleCases := []Reindeer{}
 		for _, possibleCase := range possibleCases {
 			for _, dir := range dirs {
-				if possibleCase.position.x == end.x && possibleCase.position.y == end.y {
-					continue
-				}
 				newCase, err := possibleCase.move(area, dir)
+
 				if err == nil {
-					oldBestScore, ok := visited[newCase.position]
-					if !ok || oldBestScore > newCase.score {
-						visited[newCase.position] = newCase.score
-					} else {
-						continue
+					oldBestScore, ok := visited[cacheKey(newCase)]
+					worthTrying := false
+					if !ok || newCase.score <= oldBestScore {
+						visited[cacheKey(newCase)] = newCase.score
+						worthTrying = true
 					}
+
+					if grantInstantWin[instantWinCacheKey(newCase)] {
+						winners = append(winners, newCase)
+						for _, track := range newCase.track {
+							grantInstantWin[instantWinCacheKey(track)] = true
+						}
+						worthTrying = false
+					}
+
 					if newCase.position.x == end.x && newCase.position.y == end.y {
-						continue
+						if winners[0].score > newCase.score {
+							winners = make([]Reindeer, 0)
+						}
+						winners = append(winners, newCase)
+						worthTrying = false
+						grantInstantWin = map[string]bool{}
+						for _, w := range winners {
+							grantInstantWin[instantWinCacheKey(w)] = true
+							for _, wr := range w.track {
+								grantInstantWin[instantWinCacheKey(wr)] = true
+							}
+						}
 					}
-					nextPossibleCases = append(nextPossibleCases, newCase)
+
+					if worthTrying {
+						nextPossibleCases = append(nextPossibleCases, newCase)
+					}
 				}
 			}
 		}
 		possibleCases = nextPossibleCases
 
 	}
-	for k, v := range visited {
-		logger.Printf("Reindeer %d, %d is visited at position %d", k.x, k.y, v)
-	}
-	printMap(area, visited)
-	return visited[end]
-}
 
-func printMap(area map[coord]string, visited map[coord]int) {
-	m := ""
-	for y := 0; y < 15; y++ {
-		for x := 0; x < 15; x++ {
-			if visited[coord{x, y}] > 0 {
-				m += "*"
-			} else {
-				m += area[coord{x, y}]
+	bestSpots := map[coord]bool{}
+	bestScore := math.MaxInt
+	for _, w := range winners {
+		if w.score < bestScore {
+			bestScore = w.score
+		}
+	}
+	for _, winner := range winners {
+		if winner.score == bestScore {
+			bestSpots[winner.position] = true
+			for _, t := range winner.track {
+				bestSpots[t.position] = true
 			}
 		}
-		m += "\n"
 	}
-	fmt.Println(m)
+	return bestScore, len(bestSpots)
 }
