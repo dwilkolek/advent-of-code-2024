@@ -92,7 +92,9 @@ func instantWinCacheKey(r Reindeer) string {
 	return fmt.Sprintf("pos=%d,%d, f=%d,%d score=%d", r.position.x, r.position.y, r.facing.x, r.facing.y, r.score)
 }
 func solve() (int, int) {
+	logger.Printf("Starting day 16... just letting you know it runs...")
 	file, _ := os.Open("day16/input.txt")
+
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
