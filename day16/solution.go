@@ -144,6 +144,9 @@ func solve(knownBest *Reindeer, visited map[string]int) ([]Reindeer, map[string]
 				y: 0,
 			},
 			score: 0,
+			track: map[coord]Reindeer{
+				start: Reindeer{},
+			},
 		},
 	}
 
