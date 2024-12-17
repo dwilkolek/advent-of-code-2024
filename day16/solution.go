@@ -13,17 +13,22 @@ var logger = log.Default()
 var bestScore, bestSeats = math.MaxInt32, math.MaxInt32
 
 func Part1() {
-	if bestScore == math.MaxInt32 {
-		bestScore, bestSeats = solve()
-	}
-	logger.Printf("Day 16, part 1: %d", bestScore)
+	bests := solve1(true, math.MaxInt32)
+	logger.Printf("Day 16, part 1: %d", bests[0].score)
 }
 
 func Part2() {
-	if bestSeats == math.MaxInt32 {
-		bestScore, bestSeats = solve()
+	best1 := solve1(true, math.MaxInt32)
+	bests := solve1(false, best1[0].score)
+	seats := map[coord]bool{}
+	for _, b := range bests {
+		seats[b.position] = true
+		for k, _ := range b.track {
+			seats[k] = true
+		}
 	}
-	logger.Printf("Day 16, part 2: %d", bestSeats)
+
+	logger.Printf("Day 16, part 2: %d", len(seats))
 }
 
 type coord struct {
@@ -33,7 +38,7 @@ type Reindeer struct {
 	position coord
 	score    int
 	facing   coord
-	track    []Reindeer
+	track    map[coord]Reindeer
 }
 
 var dirs = []coord{
@@ -54,6 +59,10 @@ var dirs = []coord{
 
 func (r Reindeer) move(area map[coord]string, step coord) (Reindeer, error) {
 	nextPosition := coord{r.position.x + step.x, r.position.y + step.y}
+	_, beenThere := r.track[nextPosition]
+	if beenThere {
+		return r.track[nextPosition], fmt.Errorf("been there")
+	}
 	ch, ok := area[nextPosition]
 	if !ok {
 		return Reindeer{}, fmt.Errorf("step coordinate not found")
@@ -62,11 +71,11 @@ func (r Reindeer) move(area map[coord]string, step coord) (Reindeer, error) {
 	if ch == "#" {
 		return Reindeer{}, fmt.Errorf("step coordinate is a wall")
 	}
-	newTrack := make([]Reindeer, len(r.track))
+	newTrack := map[coord]Reindeer{}
 	for k, v := range r.track {
 		newTrack[k] = v
 	}
-	newTrack = append(newTrack, r)
+	newTrack[nextPosition] = r
 	if r.facing.x == step.x && r.facing.y == step.y {
 		return Reindeer{
 			position: nextPosition,
@@ -76,23 +85,27 @@ func (r Reindeer) move(area map[coord]string, step coord) (Reindeer, error) {
 		}, nil
 	} else {
 		return Reindeer{
-			position: coord{r.position.x, r.position.y},
-			score:    r.score + 1000,
+			position: nextPosition,
+			score:    r.score + 1000 + 1,
 			facing:   step,
 			track:    newTrack,
 		}, nil
 	}
+}
 
+func (r Reindeer) uniqueId() string {
+	uniqueId := cacheKey(r)
+	for _, track := range r.track {
+		uniqueId += ";" + track.uniqueId()
+	}
+	return uniqueId
 }
 
 func cacheKey(r Reindeer) string {
-	return fmt.Sprintf("pos=%d,%d, f=%d,%d", r.position.x, r.position.y, r.facing.x, r.facing.y)
+	return fmt.Sprintf("pos=%d,%d , f=%d,%d", r.position.x, r.position.y, r.facing.x, r.facing.y)
 }
-func instantWinCacheKey(r Reindeer) string {
-	return fmt.Sprintf("pos=%d,%d, f=%d,%d score=%d", r.position.x, r.position.y, r.facing.x, r.facing.y, r.score)
-}
-func solve() (int, int) {
-	logger.Printf("Starting day 16... just letting you know it runs...")
+
+func parse() (map[coord]string, coord, coord) {
 	file, _ := os.Open("day16/input.txt")
 
 	defer file.Close()
@@ -117,6 +130,10 @@ func solve() (int, int) {
 		y++
 	}
 
+	return area, start, end
+}
+func solve1(lookForTheBest bool, skipAbove int) []Reindeer {
+	area, start, end := parse()
 	possibleCases := []Reindeer{
 		{
 			position: coord{
@@ -131,51 +148,39 @@ func solve() (int, int) {
 		},
 	}
 	visited := map[string]int{}
-	grantInstantWin := map[string]bool{}
-	winners := []Reindeer{
-		{position: end, score: math.MaxInt64, facing: coord{x: -1, y: -1}, track: []Reindeer{}},
-	}
-
+	var bestReindeers []Reindeer
 	for len(possibleCases) > 0 {
+		//logger.Printf("Queue size %d", len(possibleCases))
 		nextPossibleCases := []Reindeer{}
 		for _, possibleCase := range possibleCases {
+			if possibleCase.score > skipAbove {
+				continue
+			}
 			for _, dir := range dirs {
 				newCase, err := possibleCase.move(area, dir)
 
-				if err == nil {
-					oldBestScore, ok := visited[cacheKey(newCase)]
-					worthTrying := false
-					if !ok || newCase.score <= oldBestScore {
-						visited[cacheKey(newCase)] = newCase.score
-						worthTrying = true
-					}
+				if err != nil {
+					continue
+				}
+				oldBestScore, ok := visited[cacheKey(newCase)]
+				if !ok || (lookForTheBest && newCase.score < oldBestScore) || (!lookForTheBest && newCase.score <= oldBestScore) {
+					visited[cacheKey(newCase)] = newCase.score
+				} else {
+					continue
+				}
 
-					if grantInstantWin[instantWinCacheKey(newCase)] {
-						winners = append(winners, newCase)
-						for _, track := range newCase.track {
-							grantInstantWin[instantWinCacheKey(track)] = true
-						}
-						worthTrying = false
+				if newCase.position.x == end.x && newCase.position.y == end.y {
+					bestReindeers = append(bestReindeers, newCase)
+					if len(bestReindeers) == 0 || bestReindeers[0].score > newCase.score {
+						bestReindeers = []Reindeer{newCase}
+					} else {
+						bestReindeers = append(bestReindeers, newCase)
 					}
-
-					if newCase.position.x == end.x && newCase.position.y == end.y {
-						if winners[0].score > newCase.score {
-							winners = make([]Reindeer, 0)
-						}
-						winners = append(winners, newCase)
-						worthTrying = false
-						grantInstantWin = map[string]bool{}
-						for _, w := range winners {
-							grantInstantWin[instantWinCacheKey(w)] = true
-							for _, wr := range w.track {
-								grantInstantWin[instantWinCacheKey(wr)] = true
-							}
-						}
-					}
-
-					if worthTrying {
-						nextPossibleCases = append(nextPossibleCases, newCase)
-					}
+					//logger.Printf("Wining %d", len(bestReindeers))
+					continue
+				}
+				if newCase.score < skipAbove {
+					nextPossibleCases = append(nextPossibleCases, newCase)
 				}
 			}
 		}
@@ -183,20 +188,31 @@ func solve() (int, int) {
 
 	}
 
-	bestSpots := map[coord]bool{}
-	bestScore := math.MaxInt
-	for _, w := range winners {
-		if w.score < bestScore {
-			bestScore = w.score
-		}
-	}
-	for _, winner := range winners {
-		if winner.score == bestScore {
-			bestSpots[winner.position] = true
-			for _, t := range winner.track {
-				bestSpots[t.position] = true
-			}
-		}
-	}
-	return bestScore, len(bestSpots)
+	return bestReindeers
+}
+
+func solve2() int {
+	//exlusions := map[string]bool{}
+	//firstBest := solve1(exlusions)
+	//solutions := []Reindeer{
+	//	firstBest,
+	//}
+	//for {
+	//	solved := solve1(exlusions)
+	//	if solved.score == firstBest.score {
+	//		solutions = append(solutions, solved)
+	//	} else {
+	//		break
+	//	}
+	//}
+	//
+	//coolSpots := map[coord]bool{}
+	//for _, solution := range solutions {
+	//	coolSpots[solution.position] = true
+	//	for _, past := range solution.track {
+	//		coolSpots[past.position] = true
+	//	}
+	//}
+	//return len(coolSpots)
+	return 1
 }
