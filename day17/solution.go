@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -19,13 +20,14 @@ func Part1() {
 
 func Part2() {
 	parse()
-	logger.Printf("Day 17, part 2: %d", solve())
+	logger.Printf("Day 17, part 2: %d", solve2())
 }
 
 var registers = map[string]int{}
 var program []int
 var instrPointer = 0
 var output string
+var outputNum []int
 
 func parse() {
 	registers = map[string]int{}
@@ -94,6 +96,7 @@ func loadOpCode() bool {
 		break
 	case 5:
 		nVal := comboValue(program[instrPointer+1]) % 8
+		outputNum = append(outputNum, nVal)
 		if len(output) == 0 {
 			output = fmt.Sprintf("%d", nVal)
 		} else {
@@ -117,15 +120,36 @@ func solve() string {
 	return output
 }
 
+func solve2() int {
+	candidates := []int{0}
+	for i := len(program) - 1; i >= 0; i-- {
+		in := program[i]
+		forNext := make([]int, 0)
+		for _, candidate := range candidates {
+			for bit := 0; bit < 8; bit++ {
+				answer := candidate<<3 + bit
+				resetProgram()
+				registers["A"] = answer
+				programLoop()
+				if len(outputNum) >= 1 && outputNum[0] == in {
+					forNext = append(forNext, answer)
+				}
+			}
+		}
+		candidates = forNext
+	}
+	return slices.Min(candidates)
+}
+
 func resetProgram() {
 	registers = map[string]int{
 		"A": 0,
 		"C": 0,
 		"B": 0,
 	}
-	program = make([]int, 0)
 	instrPointer = 0
 	output = ""
+	outputNum = make([]int, 0)
 }
 
 func programLoop() {
