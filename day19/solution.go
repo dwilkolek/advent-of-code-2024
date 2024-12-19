@@ -11,38 +11,43 @@ var logger = log.Default()
 
 func Part1() {
 	towels, patterns := parse()
-	logger.Printf("Day 19, part 1: %d", solve(towels, patterns))
-}
-
-func Part2() {
-	//towels, patterns := parse()
-	//searchDict := buildDict(towels)
-	logger.Printf("Day X, part 2: %d", 1)
-}
-
-func solve(towels []string, patterns []string) int {
 	count := 0
 	for _, pattern := range patterns {
-		if isPossible(pattern, towels) {
+		if isPossible(pattern, towels) > 0 {
 			count++
 		}
 	}
-	return count
+	logger.Printf("Day 19, part 1: %d", count)
 }
 
-func isPossible(pattern string, towels []string) bool {
-	if pattern == "" {
-		return true
+func Part2() {
+	towels, patterns := parse()
+	count := 0
+	for _, pattern := range patterns {
+		count += isPossible(pattern, towels)
 	}
+	logger.Printf("Day 19, part 2: %d", count)
+}
+
+var cache = map[string]int{}
+
+func isPossible(pattern string, towels []string) int {
+	cacheValue, ok := cache[pattern]
+	if ok {
+		return cacheValue
+	}
+	if pattern == "" {
+		return 1
+	}
+	sum := 0
 	for _, towel := range towels {
 		nextPatter := strings.TrimPrefix(pattern, towel)
 		if nextPatter != pattern {
-			if isPossible(nextPatter, towels) {
-				return true
-			}
+			sum += isPossible(nextPatter, towels)
 		}
 	}
-	return false
+	cache[pattern] = sum
+	return sum
 }
 
 func parse() ([]string, []string) {
