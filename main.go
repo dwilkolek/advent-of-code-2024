@@ -1,8 +1,6 @@
 package main
 
-import (
-	"github.com/dwilkolek/advent-of-code-2024/day17"
-)
+import "github.com/dwilkolek/advent-of-code-2024/day18"
 
 func main() {
 	//day1.Part1()
@@ -37,6 +35,7 @@ func main() {
 	//day15.Part2()
 	//day16.Part1()
 	//day16.Part2()
-	day17.Part1()
-	day17.Part2()
+	//day17.Part1()
+	//day17.Part2()
+	day18.Part1()
 }
