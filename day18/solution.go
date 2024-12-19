@@ -9,43 +9,64 @@ import (
 )
 
 var logger = log.Default()
-var debug = true
+var debug = false
 
 func Part1() {
-	logger.Printf("Day X, part 1: %d", solve())
+	bytes := parse()
+	logger.Printf("Day 18, part 1: %d", solve(bytes[:12]))
 }
 
 func Part2() {
-	logger.Printf("Day X, part 2: %d", solve())
+	bytes := parse()
+	i := 0
+	step := len(bytes) / 10
+	for {
+		b := bytes[:i]
+		s := solve(b)
+		if s == math.MaxInt64-1 {
+			if step == 1 {
+				logger.Printf("Day 18, part 2: %d,%d", b[len(b)-1].x, b[len(b)-1].y)
+				return
+			}
+			i -= step
+			if step < 10 {
+				step = 1
+			} else {
+				step = step / 10
+			}
+		} else {
+			i = min(len(bytes), step+i)
+		}
+
+	}
 }
 
 type coord struct{ x, y int }
 
 var size = 70
-var limit = 1024
 
-//var size = 6
-//var limit = 12
-
-func solve() int {
-
-	logger.SetOutput(os.Stdout)
+func parse() []coord {
 	file, _ := os.Open("day18/input.txt")
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	bytes := map[coord]bool{}
+	bytes := []coord{}
 	for scanner.Scan() {
 		c := coord{}
 		_, err := fmt.Sscanf(scanner.Text(), "%d,%d", &c.x, &c.y)
 		if err != nil {
 			logger.Fatal(err)
 		}
-		bytes[c] = true
-		if len(bytes) == limit {
-			break
-		}
+		bytes = append(bytes, c)
 	}
+	return bytes
+}
+func solve(inB []coord) int {
+	bytes := map[coord]bool{}
+	for _, in := range inB {
+		bytes[in] = true
+	}
+	logger.SetOutput(os.Stdout)
 
 	bestStepCount := math.MaxInt64
 	toCheck := []wanderer{
@@ -60,17 +81,9 @@ func solve() int {
 	toCheck[0].print(bytes)
 
 	for len(toCheck) > 0 {
-		//logger.Printf("Queue size: %d", len(toCheck))
 		w := toCheck[0]
 		toCheck = toCheck[1:]
-		//w.print(bytes)
-		//cb, ok := cachedBest[w.pos]
-		//if ok && cb < len(w.history) {
-		//	continue
-		//}
-		//if len(w.history) >= bestStepCount {
-		//	continue
-		//}
+
 		best, ok := cachedBest[w.pos]
 		if !ok || best > len(w.history) {
 			cachedBest[w.pos] = len(w.history)
@@ -81,16 +94,13 @@ func solve() int {
 		if w.pos.y == size && w.pos.x == size {
 			if len(w.history) < bestStepCount {
 				bestStepCount = len(w.history)
-				logger.Printf("Current Best: %d", bestStepCount)
+				//logger.Printf("Current Best: %d", bestStepCount)
 				w.print(bytes)
 			}
 			continue
 		}
 
 		toCheck = append(toCheck, w.move(bytes)...)
-		//slices.SortFunc(toCheck, func(a, b wanderer) int {
-		//	return cmp.Compare(a.dist+len(a.history), b.dist+len(b.history))
-		//})
 	}
 
 	return bestStepCount - 1
