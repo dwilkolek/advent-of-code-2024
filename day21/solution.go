@@ -2,261 +2,243 @@ package day21
 
 import (
 	"bufio"
-	"errors"
 	"log"
-	"math"
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 )
+
+type sequenceKey struct {
+	sequence string
+	depth    int
+}
+
+var sequenceCache = make(map[sequenceKey]int)
 
 var logger = log.Default()
 
 func Part1() {
-	logger.Printf("Day X, part 1: %d", solve())
+	logger.Printf("Day 21, part 1: %d", solve(3))
 }
 
 func Part2() {
-	logger.Printf("Day X, part 2: %d", solve())
+	logger.Printf("Day 21, part 2: %d", solve(26))
 }
 
-type coord struct {
-	x, y int
-}
-
-var numpad = map[coord]string{
-	{0, 0}: "7",
-	{1, 0}: "8",
-	{2, 0}: "9",
-	{0, 1}: "4",
-	{1, 1}: "5",
-	{2, 1}: "6",
-	{0, 2}: "1",
-	{1, 2}: "2",
-	{2, 2}: "3",
-	{1, 3}: "0",
-	{2, 3}: "A",
-}
-var dirBoard = map[coord]string{
-	{1, 0}: "^",
-	{2, 0}: "A",
-	{0, 1}: "<",
-	{1, 1}: "v",
-	{2, 1}: ">",
-}
-
-var moves = map[string]coord{
-	"v": {x: 0, y: 1},
-	"^": {x: 0, y: -1},
-	"<": {x: -1, y: 0},
-	">": {x: 1, y: 0},
-}
-
-func findCoordOfKey(key string, keybaord map[coord]string) (coord, error) {
-	for kKeyCoord, kKey := range keybaord {
-		if key == kKey {
-			return kKeyCoord, nil
-		}
+func solve(robots int) int {
+	codes := parse()
+	complexityScore := 0
+	for _, code := range codes {
+		complexityScore += calculateScore(code, robots) // 26 robots
 	}
-	return coord{}, errors.New("key not found")
+	return complexityScore
 }
-func findStepsToKey(fromKey, toKey string, keyboard map[coord]string, history []string, level int, seen map[string]bool) [][]string {
-	if _, ok := seen[strings.Join(history, ",")]; ok {
-		return [][]string{}
-	}
-	seen[strings.Join(history, ",")] = true
-	hitCount := 0
-	fromKeyCoord, err := findCoordOfKey(fromKey, keyboard)
-	if err != nil {
-		panic(err)
-	}
-	toKeyCoord, err := findCoordOfKey(toKey, keyboard)
-	if err != nil {
-		panic(err)
+
+func calculateScore(code string, robots int) int {
+	numericCode, _ := codeToInteger(code)
+	length := getSequenceLength(code, robots)
+	return numericCode * length
+}
+
+func getSequenceLength(targetSequence string, depth int) int {
+	key := sequenceKey{sequence: targetSequence, depth: depth}
+	if value, exists := sequenceCache[key]; exists {
+		return value
 	}
 
-	if fromKeyCoord == toKeyCoord {
-		return [][]string{
-			append(history, "A"),
+	length := 0
+	if depth == 0 {
+		length = len(targetSequence)
+	} else {
+		current := 'A'
+		for _, next := range targetSequence {
+			len := getMoveCount(current, next, depth)
+			current = next
+			length += len
 		}
 	}
 
-	possibleSolutions := [][]string{}
-	for moveSign, move := range moves {
-		newFromKeyCoord := coord{
-			x: fromKeyCoord.x + move.x,
-			y: fromKeyCoord.y + move.y,
-		}
-		if newKey, ok := keyboard[newFromKeyCoord]; ok {
-			hitCount++
-			oldDist := dist(fromKeyCoord, toKeyCoord)
-			newDist := dist(newFromKeyCoord, toKeyCoord)
-			if newDist < oldDist {
-				solutions := findStepsToKey(newKey, toKey, keyboard, append(history, moveSign), level+1, seen)
-				possibleSolutions = append(possibleSolutions, solutions...)
-			}
+	sequenceCache[key] = length
+	return length
+}
+
+func getMoveCount(current, next rune, depth int) int {
+	if current == next {
+		return 1
+	}
+	newSequence := paths[buttonPair{first: current, second: next}]
+	return getSequenceLength(newSequence, depth-1)
+}
+
+func codeToInteger(input string) (int, error) {
+	var numericPart strings.Builder
+	for _, char := range input {
+		if unicode.IsDigit(char) {
+			numericPart.WriteRune(char)
 		}
 	}
-	//if level == 0 {
-	//	logger.Printf("Find key(%d) from %s to %s returned %d, dist=%d", level, fromKey, toKey, len(possibleSolutions), len(possibleSolutions[0])-1)
-	//}
-	return possibleSolutions
+
+	return strconv.Atoi(numericPart.String())
 }
 
-func dist(a, b coord) float64 {
-	return math.Abs(float64(a.x-b.x)) + math.Abs(float64(a.y-b.y))
-}
-
-func solve() int {
+func parse() []string {
 	file, _ := os.Open("day21/input.txt")
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	scanner := bufio.NewScanner(file)
-	totalComplexity := 0
+
+	var lines []string
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		buttons := strings.Split(line, "")
-		v := stage2(buttons, numpad)
-		logger.Printf("Stage 1 combinations : %d,", len(v))
-
-		var v2 [][]string
-		for _, vi := range v {
-			v2S := stage2(vi, dirBoard)
-			logger.Printf("For %s got %d", strings.Join(vi, ""), len(v2S))
-			for _, v2i := range v2S {
-				v2 = append(v2, v2i)
-			}
+		if len(line) > 0 {
+			lines = append(lines, line)
 		}
-
-		logger.Printf("Stage 2 combinations : %d, ", len(v2))
-		//logger.Printf("Stage 2 %d: %v", len(v2), v2)
-		var v3 [][]string
-		for _, vi := range v2 {
-			for _, v3i := range stage2(vi, dirBoard) {
-				v3 = append(v3, v3i)
-			}
-		}
-
-		//logger.Printf("Stage 3 comintation : %d", len(v3))
-
-		logger.Printf("Stage 3 combinations : %d,", len(v3))
-		bestV3 := math.MaxInt
-		for _, v3i := range v3 {
-			if len(v3i) <= bestV3 {
-				bestV3 = len(v3i)
-			}
-		}
-
-		logger.Printf("Stage 3: %d", bestV3)
-		code, _ := strconv.Atoi(strings.Join(buttons[0:3], ""))
-		totalComplexity += code * bestV3
 	}
-	return totalComplexity
+
+	return lines
 }
 
-func findBest(list [][]string) [][]string {
-	bestSize := math.MaxInt
-	for _, item := range list {
-		if len(item) < bestSize {
-			bestSize = len(item)
-		}
-	}
-	//2024/12/21 18:49:03 Stage 1 12: [< A ^ ^ ^ A v A > v v A]
-	//2024/12/21 18:49:03 Stage 2 28: [v < < A > > ^ A < A A A > A < v A > ^ A v A < A A > ^ A]
-	//2024/12/21 18:49:03 Stage 3 70: [v < A < A A > ^ > A v A A ^ < A > A < v < A > > ^ A A A v A ^ A v < < A > A > ^ A v A < ^ A > A < v A ^ > A v < < A > > ^ A A v A < ^ A > A]
-
-	//2024/12/21 18:49:27 Stage 1 12: [< A ^ ^ ^ A v A v v > A]
-	//2024/12/21 18:49:27 Stage 2 28: [v < < A > > ^ A < A A A > A v < A ^ > A < v A A > A ^ A]
-	//2024/12/21 18:49:27 Stage 3 66: [v < A < A A > ^ > A v A A ^ < A > A v < < A > > ^ A A A v A ^ A v < A < A > > ^ A < A > v A ^ A < v < A > A > ^ A A v A ^ A < A > A]
-	best := make([][]string, 0)
-	for _, item := range list {
-		if len(item) == bestSize {
-			best = append(best, item)
-		}
-	}
-
-	return best
+type buttonPair struct {
+	first  rune
+	second rune
 }
 
-func stage1(buttons []string) [][]string {
-	buttons = append([]string{"A"}, buttons...)
-	atButton := 0
-	solutions := map[int][][]string{}
-	for atButton = 0; atButton < len(buttons)-1; atButton++ {
-		v := findStepsToKey(buttons[atButton], buttons[atButton+1], numpad, []string{}, 0, map[string]bool{})
-		if prev, prevOk := solutions[atButton-1]; prevOk {
-			solutions[atButton] = [][]string{}
-			for _, vi := range v {
-				for _, previ := range prev {
-					solutions[atButton] = append(solutions[atButton], append(previ, vi...))
-				}
-			}
-		} else {
-			solutions[atButton] = v
-		}
-
-	}
-
-	return solutions[atButton-1]
-}
-func stage2(buttons []string, kb map[coord]string) [][]string {
-	solutions := map[int][][]string{}
-	buttons = append([]string{"A"}, buttons...)
-
-	for atButton := 0; atButton < len(buttons)-1; atButton++ {
-		v := findStepsToKey(buttons[atButton], buttons[atButton+1], kb, []string{}, 0, map[string]bool{})
-		if atButton == 0 {
-			solutions[atButton] = v
-			continue
-		}
-		//prev, _ := solutions[atButton-1]
-		for _, vi := range v {
-			solutions[atButton] = append(solutions[atButton], vi)
-		}
-
-		//prev, prevOk := solutions[atButton-1]
-		//if prevOk {
-		//	for _, vi := range v {
-		//		for _, previ := range prev {
-		//			solutions[atButton] = append(solutions[atButton], append(previ, vi...))
-		//		}
-		//	}
-		//} else {
-		//	logger.Printf("Creating new %d for l=%d", atButton, len(v))
-		//	solutions[atButton] = v
-		//}
-	}
-
-	finalSolutions := solutions[0]
-	for atButton := 1; atButton < len(buttons)-1; atButton++ {
-		newFinalSolutions := make([][]string, 0)
-		for _, p := range finalSolutions {
-			for _, n := range solutions[atButton] {
-				//logger.Printf("Creating from %s -> %s", strings.Join(n, ""), strings.Join(append(p, n...), ""))
-				nv := []string{}
-				for _, pi := range p {
-					nv = append(nv, pi)
-				}
-				for _, ni := range n {
-					nv = append(nv, ni)
-				}
-				newFinalSolutions = append(newFinalSolutions, nv)
-				//logger.Printf("Result %s", strings.Join(newFinalSolutions[len(newFinalSolutions)-1], ""))
-
-			}
-		}
-		finalSolutions = newFinalSolutions
-	}
-
-	//best := math.MaxInt
-	//for _, x := range solutions[len(buttons)-2] {
-	//	if len(x) < best {
-	//		best = len(x)
-	//	}
-	//}
-	//if best < len(solutions[len(buttons)-2][0]) {
-	//	panic("There is shorted but returning Longer")
-	//}
-	//logger.Printf("shortes: %d, but %d", best, len(solutions[atButton-1][0]))
-	return finalSolutions
+var paths = map[buttonPair]string{
+	{'A', '0'}: "<A",
+	{'0', 'A'}: ">A",
+	{'A', '1'}: "^<<A",
+	{'1', 'A'}: ">>vA",
+	{'A', '2'}: "<^A",
+	{'2', 'A'}: "v>A",
+	{'A', '3'}: "^A",
+	{'3', 'A'}: "vA",
+	{'A', '4'}: "^^<<A",
+	{'4', 'A'}: ">>vvA",
+	{'A', '5'}: "<^^A",
+	{'5', 'A'}: "vv>A",
+	{'A', '6'}: "^^A",
+	{'6', 'A'}: "vvA",
+	{'A', '7'}: "^^^<<A",
+	{'7', 'A'}: ">>vvvA",
+	{'A', '8'}: "<^^^A",
+	{'8', 'A'}: "vvv>A",
+	{'A', '9'}: "^^^A",
+	{'9', 'A'}: "vvvA",
+	{'0', '1'}: "^<A",
+	{'1', '0'}: ">vA",
+	{'0', '2'}: "^A",
+	{'2', '0'}: "vA",
+	{'0', '3'}: "^>A",
+	{'3', '0'}: "<vA",
+	{'0', '4'}: "^<^A",
+	{'4', '0'}: ">vvA",
+	{'0', '5'}: "^^A",
+	{'5', '0'}: "vvA",
+	{'0', '6'}: "^^>A",
+	{'6', '0'}: "<vvA",
+	{'0', '7'}: "^^^<A",
+	{'7', '0'}: ">vvvA",
+	{'0', '8'}: "^^^A",
+	{'8', '0'}: "vvvA",
+	{'0', '9'}: "^^^>A",
+	{'9', '0'}: "<vvvA",
+	{'1', '2'}: ">A",
+	{'2', '1'}: "<A",
+	{'1', '3'}: ">>A",
+	{'3', '1'}: "<<A",
+	{'1', '4'}: "^A",
+	{'4', '1'}: "vA",
+	{'1', '5'}: "^>A",
+	{'5', '1'}: "<vA",
+	{'1', '6'}: "^>>A",
+	{'6', '1'}: "<<vA",
+	{'1', '7'}: "^^A",
+	{'7', '1'}: "vvA",
+	{'1', '8'}: "^^>A",
+	{'8', '1'}: "<vvA",
+	{'1', '9'}: "^^>>A",
+	{'9', '1'}: "<<vvA",
+	{'2', '3'}: ">A",
+	{'3', '2'}: "<A",
+	{'2', '4'}: "<^A",
+	{'4', '2'}: "v>A",
+	{'2', '5'}: "^A",
+	{'5', '2'}: "vA",
+	{'2', '6'}: "^>A",
+	{'6', '2'}: "<vA",
+	{'2', '7'}: "<^^A",
+	{'7', '2'}: "vv>A",
+	{'2', '8'}: "^^A",
+	{'8', '2'}: "vvA",
+	{'2', '9'}: "^^>A",
+	{'9', '2'}: "<vvA",
+	{'3', '4'}: "<<^A",
+	{'4', '3'}: "v>>A",
+	{'3', '5'}: "<^A",
+	{'5', '3'}: "v>A",
+	{'3', '6'}: "^A",
+	{'6', '3'}: "vA",
+	{'3', '7'}: "<<^^A",
+	{'7', '3'}: "vv>>A",
+	{'3', '8'}: "<^^A",
+	{'8', '3'}: "vv>A",
+	{'3', '9'}: "^^A",
+	{'9', '3'}: "vvA",
+	{'4', '5'}: ">A",
+	{'5', '4'}: "<A",
+	{'4', '6'}: ">>A",
+	{'6', '4'}: "<<A",
+	{'4', '7'}: "^A",
+	{'7', '4'}: "vA",
+	{'4', '8'}: "^>A",
+	{'8', '4'}: "<vA",
+	{'4', '9'}: "^>>A",
+	{'9', '4'}: "<<vA",
+	{'5', '6'}: ">A",
+	{'6', '5'}: "<A",
+	{'5', '7'}: "<^A",
+	{'7', '5'}: "v>A",
+	{'5', '8'}: "^A",
+	{'8', '5'}: "vA",
+	{'5', '9'}: "^>A",
+	{'9', '5'}: "<vA",
+	{'6', '7'}: "<<^A",
+	{'7', '6'}: "v>>A",
+	{'6', '8'}: "<^A",
+	{'8', '6'}: "v>A",
+	{'6', '9'}: "^A",
+	{'9', '6'}: "vA",
+	{'7', '8'}: ">A",
+	{'8', '7'}: "<A",
+	{'7', '9'}: ">>A",
+	{'9', '7'}: "<<A",
+	{'8', '9'}: ">A",
+	{'9', '8'}: "<A",
+	{'<', '^'}: ">^A",
+	{'^', '<'}: "v<A",
+	{'<', 'v'}: ">A",
+	{'v', '<'}: "<A",
+	{'<', '>'}: ">>A",
+	{'>', '<'}: "<<A",
+	{'<', 'A'}: ">>^A",
+	{'A', '<'}: "v<<A",
+	{'^', 'v'}: "vA",
+	{'v', '^'}: "^A",
+	{'^', '>'}: "v>A",
+	{'>', '^'}: "<^A",
+	{'^', 'A'}: ">A",
+	{'A', '^'}: "<A",
+	{'v', '>'}: ">A",
+	{'>', 'v'}: "<A",
+	{'v', 'A'}: "^>A",
+	{'A', 'v'}: "<vA",
+	{'>', 'A'}: "^A",
+	{'A', '>'}: "vA",
 }
