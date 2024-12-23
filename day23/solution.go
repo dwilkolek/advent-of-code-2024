@@ -11,28 +11,55 @@ import (
 var logger = log.Default()
 
 func Part1() {
-	logger.Printf("Day X, part 1: %d", solve())
+	parse()
+	cliques := findCliques()
+	counter := 0
+	for _, clique := range cliques {
+		if hasT(clique) {
+			counter++
+		}
+	}
+	logger.Printf("Day 23, part 1: %d", counter)
 }
 
 func Part2() {
-	logger.Printf("Day X, part 2: %d", solve())
+	parse()
+	cliques := findCliques()
+
+	logger.Printf("Day 23, part 2: %s", extendCliqueAndReturnPassword(cliques))
+}
+
+type pair struct {
+	a, b string
 }
 
 var network = map[string][]string{}
+var adjNetwork = map[pair]bool{}
 
-func solve() int {
+func parse() {
 	file, _ := os.Open("day23/input.txt")
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	scanner := bufio.NewScanner(file)
-
+	network = map[string][]string{}
+	adjNetwork = map[pair]bool{}
 	for scanner.Scan() {
 		conn := scanner.Text()
 		computers := strings.Split(conn, "-")
 		network[computers[0]] = append(network[computers[0]], computers[1])
 		network[computers[1]] = append(network[computers[1]], computers[0])
+		adjNetwork[pair{computers[0], computers[1]}] = true
+		adjNetwork[pair{computers[1], computers[0]}] = true
 	}
-	counter := 0
+}
+
+func findCliques() map[string][]string {
+
 	mNetworks := [][]string{}
 	for c, _ := range network {
 		mNetworks = append(mNetworks, buildNetwork(c)...)
@@ -46,21 +73,63 @@ func solve() int {
 			}
 		}
 	}
+	return allCliques
+}
 
-	for _, cliques := range allCliques {
-		if hasT(cliques) {
-			counter++
+func extendCliqueAndReturnPassword(cliques map[string][]string) string {
+	maxLen := 0
+	var biggest []string
+	for _, c := range cliques {
+		m := findNext(c)
+		if maxLen < len(m) {
+			maxLen = len(m)
+			biggest = m
+		}
+	}
+	return groupId(biggest)
+}
+
+func findNext(g []string) []string {
+	net := map[string]bool{}
+	for _, gi := range g {
+		net[gi] = true
+	}
+
+	newAddition := true
+	for newAddition {
+		newAddition = false
+		for k, _ := range network {
+			if net[k] {
+				continue
+			}
+			connectedToRest := true
+			for c2, _ := range net {
+				if !adjNetwork[pair{a: k, b: c2}] {
+					connectedToRest = false
+					break
+				}
+			}
+
+			if connectedToRest {
+				newAddition = true
+				net[k] = true
+			}
 		}
 	}
 
-	return counter
+	group := []string{}
+	for k, _ := range net {
+		group = append(group, k)
+	}
+
+	return group
 }
+
 func groupId(computers []string) string {
 	copied := make([]string, len(computers))
 	copy(copied, computers)
 	slices.Sort(copied)
-	//logger.Println(strings.Join(copied, "-"))
-	return strings.Join(copied, "-")
+	return strings.Join(copied, ",")
 }
 
 func hasT(computers []string) bool {
@@ -71,31 +140,6 @@ func hasT(computers []string) bool {
 	}
 	return false
 }
-
-func isInNetwork(n []string, c string) bool {
-	for _, ni := range n {
-		if ni == c {
-			return true
-		}
-	}
-	return false
-}
-
-//func buildNetwork(networkDepth int, mNetworks [][]string) [][]string {
-//	newMNetworks := [][]string{}
-//	for _, mNetwork := range mNetworks {
-//		for _, c := range network[mNetwork[len(mNetwork)-1]] {
-//			if !isInNetwork(mNetwork, c) {
-//				newMNetworks = append(newMNetworks, append(mNetwork, c))
-//			}
-//		}
-//	}
-//	if networkDepth == 0 {
-//
-//		return newMNetworks
-//	}
-//	return buildNetwork(networkDepth-1, newMNetworks)
-//}
 
 func find3rd(a, b string) [][]string {
 	networks := [][]string{}
@@ -108,6 +152,7 @@ func find3rd(a, b string) [][]string {
 	}
 	return networks
 }
+
 func buildNetwork(computer string) [][]string {
 	connected := network[computer]
 	groups := [][]string{}
@@ -115,14 +160,4 @@ func buildNetwork(computer string) [][]string {
 		groups = append(groups, find3rd(computer, n1)...)
 	}
 	return groups
-}
-
-func expand(computer string, pairs [][]string) [][]string {
-	ngGroup := [][]string{}
-	for _, c := range network[computer] {
-		for _, pair := range pairs {
-			ngGroup = append(ngGroup, append(pair, c))
-		}
-	}
-	return ngGroup
 }
